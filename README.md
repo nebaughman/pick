@@ -6,7 +6,7 @@ A dependency injection helper.
 
 ## How?
 
-Kindly refer to the unit test for an example.
+Kindly refer to the unit tests for examples.
 
 ## Why?
 

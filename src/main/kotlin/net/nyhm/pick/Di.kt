@@ -31,7 +31,8 @@ class SingletonDiFactory<T>(private val factory: DiFactory<T>): DiFactory<T> {
  * is registered, one will be chosen (but which one is left undefined).
  */
 class Di(
-  private val map: Map<KClass<*>,DiFactory<*>>
+  private val map: Map<KClass<*>,DiFactory<*>>,
+  private val parent: Di?,
 ) {
   /**
    * Get an instance of the requested type.
@@ -71,12 +72,15 @@ class Di(
    * See class documentation for instance rules.
    */
   private fun <T:Any> find(type: KClass<T>): DiFactory<out T> {
-    val factory = map[type] ?: map.entries.firstOrNull { it.key.isSubclassOf(type) }?.value ?: throw MissingTypeException(type)
+    var factory = map[type]
+    if (factory == null) factory = map.entries.firstOrNull { it.key.isSubclassOf(type) }?.value
+    if (factory == null && parent != null) factory = parent.find(type)
+    if (factory == null) throw MissingTypeException(type)
     @Suppress("UNCHECKED_CAST") return factory as DiFactory<out T>
   }
 }
 
-// TODO: rename DiRegistrar?
+// TODO: rename DiRegistrar? DiContext?
 /**
  * A dependency injection instance factory service.
  * - Use [DiBuilder] to register types with a factory for instances of that type.
@@ -85,11 +89,16 @@ class Di(
  * A [Di] instance is bound to this builder. Changes to the registered factories
  * are reflected in the [Di] instance. The purpose of the builder is to separate
  * registration (configuration) from users that produce instances.
+ *
+ * Create a DI context with an optional parent, which is consulted if a match is not
+ * found in the current context. Notice that lookup rules about precision do not apply
+ * across contexts. The parent is searched only if all rules for finding a match in the
+ * current context fail.
  */
-class DiBuilder {
+class DiBuilder(parent: Di? = null) {
   private val map = mutableMapOf<KClass<*>,DiFactory<*>>()
 
-  val di = Di(map)
+  val di = Di(map, parent)
 
   /**
    * Register a type with a factory that produces instances of that type.

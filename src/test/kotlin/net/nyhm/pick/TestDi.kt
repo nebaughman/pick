@@ -101,4 +101,36 @@ internal class DiTest {
     assertEquals(6, di.get<InstanceCounter>().id) // same instance
     assertEquals(6, InstanceCounter.instanceCount) // for good measure
   }
+
+  @Test
+  fun testParentage() {
+    // parent with a Citrus Lemon
+    val parent = DiBuilder()
+      .register { Lemon() }
+      .register { 1 }
+      .also {
+        assertEquals(Lemon::class, it.di.get<Lemon>()::class) { "Parent has a Lemon" }
+        assertEquals(Lemon::class, it.di.get<Citrus>()::class) { "Parent has a Citrus (the Lemon)" }
+        assertEquals(it.di.get<Int>(), 1) { "Parent has Int(1)" }
+      }
+
+    // child with Banana (non-Citrus Fruit), using parent context
+    val child = DiBuilder(parent.di).register(Banana).also {
+      assertEquals(Banana::class, it.di.get<Banana>()::class) { "Child has a Banana" }
+      assertEquals(Lemon::class, it.di.get<Lemon>()::class) { "Child found a Lemon" }
+      assertEquals(Lemon::class, it.di.get<Citrus>()::class) { "Child found a Citrus (parent Lemon)" }
+      assertEquals(Banana::class, it.di.get<Fruit>()::class) { "Child finds local Fruit (Banana)" }
+    }
+
+    // child now has local Citrus Orange
+    child.register(Orange(ManualPeeler())).also {
+      assertEquals(Orange::class, it.di.get<Citrus>()::class) { "Child found Citrus Orange before parent's Lemon" }
+    }
+
+    child.register { 2 }.also {
+      assertEquals(it.di.get<Int>(), 2) { "Child overrides parent's Int = 2" }
+    }
+
+    assertEquals(parent.di.get<Int>(), 1) { "Parent's Int is still 1" }
+  }
 }
